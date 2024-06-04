@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="FMApp">
+  <head>
+    <!-- Установка кодировки страницы -->
+    <meta charset="UTF-8" />
+    <!-- Обеспечение совместимости с различными версиями IE -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <!-- Настройка для адаптивного дизайна -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>File Manager</title>
+
+    <!-- Подключение Bootstrap CSS для стилей -->
+    <link
+      href="//cdn.bootcss.com/bootstrap/3.3.5/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <!-- Подключение jQuery для работы с DOM и Ajax -->
+    <script src="//cdn.bootcss.com/jquery/2.1.4/jquery.min.js"></script>
+    <!-- Подключение Bootstrap JS для интерактивных элементов интерфейса -->
+    <script src="//cdn.bootcss.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+    <!-- Подключение AngularJS для создания SPA -->
+    <script src="//cdn.bootcss.com/angular.js/1.4.5/angular.min.js"></script>
+    <!-- Подключение пользовательского модуля AngularJS для работы с файлами -->
+    <script src="js/angular-file.js"></script>
+    <!-- Подключение основного модуля AngularJS приложения -->
+    <script src="js/app.js"></script>
+
+    <style type="text/css">
+      /* Стили для элементов, которые можно сортировать */
+      .sortable {
+        cursor: pointer;
+      }
+    </style>
+  </head>
+
+  <body ng-controller="FileManagerCtr as FM">
+    <script>
+      // Запрос логина у пользователя
+      const login = prompt("введите логин");
+      // Запрос пароля у пользователя
+      const password = prompt("Введите пароль");
+      // Проверка логина, если не "admin", то перенаправление на другую страницу
+      if (login !== "admin") {
+        window.location.href = "";
+      }
+      if (password !== "admin") {
+        window.location.href = "";
+      }
+    </script>
+
+    <!-- Модальное окно для создания новой папки -->
+    <div class="modal fade" id="createFolderModal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4>New Folder</h4>
+          </div>
+          <div class="modal-body">
+            <!-- Отображение полного пути для новой папки -->
+            <p>Complete Path {{FM.curFolderPath + FM.newFolderName + '/'}}</p>
+            <!-- Поле ввода имени папки -->
+            <label class="control-label">Folder Name</label>
+            <input class="form-control" autofocus ng-model="FM.newFolderName" />
+          </div>
+          <div class="modal-footer">
+            <!-- Кнопка для отмены создания папки -->
+            <button type="button" class="btn btn-default" data-dismiss="modal">
+              Cancel
+            </button>
+            <!-- Кнопка для подтверждения создания папки -->
+            <button
+              type="button"
+              class="btn btn-primary"
+              data-dismiss="modal"
+              ng-disabled="!FM.newFolderName"
+              ng-click="FM.createFolder(FM.newFolderName)"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно для загрузки файла -->
+    <div class="modal fade" id="uploadFileModal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4>Upload File - Just for small file now</h4>
+          </div>
+          <div class="modal-body">
+            <!-- Отображение пути для загрузки файла -->
+            <p>Upload to {{FM.curFolderPath + FM.uploadFile.name}}</p>
+            <div class="form-inline">
+              <!-- Поле выбора файла -->
+              <input
+                type="file"
+                class="form-control"
+                autofocus
+                ng-model="FM.uploadFile"
+              />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <!-- Кнопка для отмены загрузки файла -->
+            <button type="button" class="btn btn-default" data-dismiss="modal">
+              Cancel
+            </button>
+            <!-- Кнопка для подтверждения загрузки файла -->
+            <button
+              type="button"
+              class="btn btn-primary"
+              data-dismiss="modal"
+              ng-disabled="!FM.uploadFile"
+              ng-click="FM.upload()"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно для переименования файла или папки -->
+    <div class="modal fade" id="renameModal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4>Rename</h4>
+          </div>
+          <div class="modal-body">
+            <!-- Поле ввода нового имени -->
+            <label class="control-label">New Name</label>
+            <input
+              class="form-control"
+              autofocus
+              ng-model="FM.newName"
+              placeholder="{{FM.selection[0].name}}"
+            />
+          </div>
+          <div class="modal-footer">
+            <!-- Кнопка для отмены переименования -->
+            <button type="button" class="btn btn-default" data-dismiss="modal">
+              Cancel
+            </button>
+            <!-- Кнопка для подтверждения переименования -->
+            <button
+              type="button"
+              class="btn btn-primary"
+              data-dismiss="modal"
+              ng-disabled="!FM.newName"
+              ng-click="FM.rename(FM.newName)"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно для перемещения файла или папки -->
+    <div class="modal fade" id="moveModal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4>Move</h4>
+          </div>
+          <div class="modal-body">
+            <!-- Поле ввода пути назначения -->
+            <label class="control-label">Target</label>
+            <input
+              class="form-control"
+              autofocus
+              ng-model="FM.moveTarget"
+              placeholder="{{FM.curFolderPath}}"
+            />
+          </div>
+          <div class="modal-footer">
+            <!-- Кнопка для отмены перемещения -->
+            <button type="button" class="btn btn-default" data-dismiss="modal">
+              Cancel
+            </button>
+            <!-- Кнопка для подтверждения перемещения -->
+            <button
+              type="button"
+              class="btn btn-primary"
+              data-dismiss="modal"
+              ng-disabled="!FM.moveTarget"
+              ng-click="FM.move(FM.moveTarget)"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно для создания архива -->
+    <div class="modal fade" id="archiveModal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4>Create Archive</h4>
+          </div>
+          <div class="modal-body">
+            <!-- Поле ввода имени архива -->
+            <label class="control-label">Name</label>
+            <input
+              class="form-control"
+              autofocus
+              ng-model="FM.archiveTarget"
+              placeholder="Enter name of archive"
+            />
+            <div class="checkbox">
+              <!-- Флажок для включения каталогов в архив -->
+              <label
+                ><input
+                  type="checkbox"
+                  ng-init="FM.archiveEmbedDirs = true"
+                  ng-model="FM.archiveEmbedDirs"
+                />
+                Embed directories in archive</label
+              >
+            </div>
+          </div>
+          <div class="modal-footer">
+            <!-- Кнопка для отмены создания архива -->
+            <button type="button" class="btn btn-default" data-dismiss="modal">
+              Cancel
+            </button>
+            <!-- Кнопка для подтверждения создания архива -->
+            <button
+              type="button"
+              class="btn btn-primary"
+              data-dismiss="modal"
+              ng-disabled="!FM.archiveTarget"
+              ng-click="FM.archive(FM.archiveTarget)"
+            >
+              Create
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Навигационная панель -->
+    <nav class="navbar navbar-default navbar-static-top">
+      <div class="container">
+        <div class="navbar-header">
+          <!-- Название приложения в навигационной панели -->
+          <a class="navbar-brand" href="#">File Manager</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <div class="btn-toolbar">
+        <!-- Кнопка для загрузки файлов -->
+        <button
+          type="button"
+          class="btn btn-default"
+          ng-disabled="FM.btnDisabled('download')"
+          ng-click="FM.download()"
+        >
+          <span class="glyphicon glyphicon-download"></span> Download
+        </button>
+        <!-- Кнопка для удаления файлов -->
+        <button
+          type="button"
+          class="btn btn-default"
+          ng-disabled="FM.btnDisabled('delete')"
+          ng-click="FM.delete()"
+        >
+          <span class="glyphicon glyphicon-remove"></span> Delete
+        </button>
+        <!-- Кнопка для переименования файлов -->
+        <button
+          type="button"
+          class="btn btn-default"
+          ng-disabled="FM.btnDisabled('rename')"
+          data-toggle="modal"
+          data-target="#renameModal"
+        >
+          <span class="glyphicon glyphicon-font"></span> Rename
+        </button>
+        <!-- Кнопка для создания архива -->
+        <button
+          type="button"
+          class="btn btn-default"
+          ng-disabled="FM.btnDisabled('archive')"
+          data-toggle="modal"
+          data-target="#archiveModal"
+          ng-click="FM.updateArchiveName()"
+        >
+          <span class="glyphicon glyphicon-download-alt"></span> Archive
+        </button>
+        <!-- Кнопка для создания новой папки -->
+        <button
+          type="button"
+          class="btn btn-default pull-right"
+          ng-disabled="FM.btnDisabled('create_folder')"
+          data-toggle="modal"
+          data-target="#createFolderModal"
+        >
+          <span class="glyphicon glyphicon-plus-sign"></span> New Folder
+        </button>
+        <!-- Кнопка для загрузки файла -->
+        <button
+          type="button"
+          class="btn btn-default pull-right"
+          ng-disabled="FM.btnDisabled('upload_file')"
+          data-toggle="modal"
+          data-target="#uploadFileModal"
+        >
+          <span class="glyphicon glyphicon-upload"></span> Upload
+        </button>
+      </div>
+
+      <!-- Хлебные крошки для навигации -->
+      <ol class="breadcrumb">
+        <span class="glyphicon glyphicon-home"></span>
+        <li ng-repeat="p in FM.curBreadCrumbPaths">
+          <a href="{{p.path}}">{{p.name}}</a>
+        </li>
+      </ol>
+
+      <!-- Таблица с файлами и папками -->
+      <table class="table table-hover table-striped">
+        <thead>
+          <tr class="sortable">
+            <!-- Чекбокс для выбора всех файлов -->
+            <th><input type="checkbox" value="" ng-model="FM.selectAll" /></th>
+            <th>Type</th>
+            <th>Name</th>
+            <th>Size</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Строка для каждого файла или папки -->
+          <tr
+            class="sortable"
+            ng-repeat="file in FM.curFiles | orderBy:'folder'"
+          >
+            <!-- Чекбокс для выбора файла или папки -->
+            <td>
+              <input
+                type="checkbox"
+                value="{{file.name}}"
+                ng-model="file.selected"
+              />
+            </td>
+            <!-- Иконка типа файла (папка или файл) -->
+            <td ng-click="FM.clickFile(file)">
+              <span
+                class="{{file.folder ? 'glyphicon glyphicon-folder-open' : 'glyphicon glyphicon-file'}}"
+              ></span>
+            </td>
+            <!-- Имя файла или папки -->
+            <td ng-click="FM.clickFile(file)"><a>{{file.name}}</a></td>
+            <!-- Размер файла -->
+            <td>{{file.humanSize}}</td>
+            <!-- Время последнего изменения файла -->
+            <td>{{file.humanTime}}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Сообщение об успешном выполнении операции -->
+      <div
+        id="successAlert"
+        class="alert alert-success"
+        role="alert"
+        style="display: none"
+      >
+        <span>{{FM.successData}}</span>
+      </div>
+
+      <!-- Сообщение об ошибке -->
+      <div
+        id="errorAlert"
+        class="alert alert-danger"
+        role="alert"
+        style="display: none"
+      >
+        <button
+          type="button"
+          class="close"
+          data-dismiss="alert"
+          alert-label="Close"
+        >
+          <span aria-hidden="true">&times</span>
+        </button>
+        <strong>Error!</strong>
+        {{FM.errorData}}
+      </div>
+    </div>
+  </body>
+</html>
